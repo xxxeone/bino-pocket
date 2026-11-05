@@ -20,6 +20,7 @@ export const CATEGORIES: Option[] = [
   { id: "supplies", label: "Supplies 物资", emoji: "📦", platforms: ["printing", "stationery", "firstaid", "huolala"] },
   { id: "telecom", label: "eSIM / Data 通讯", emoji: "📶", platforms: ["esim", "klook", "sim"] },
   { id: "tickets", label: "Tickets / Activities 门票", emoji: "🎟️", platforms: ["klook", "ctrip", "venue"] },
+  { id: "guide", label: "Guide / Local partner 导游地接", emoji: "🧭" },
   { id: "transfer", label: "Transfer to teammate 转账", emoji: "🔁" },
   { id: "cash_in", label: "Petty cash received 收现金", emoji: "💵" },
   { id: "other", label: "Other 其他", emoji: "📝" },

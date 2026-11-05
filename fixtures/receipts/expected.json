@@ -81,5 +81,90 @@
       "description_like": "Didi - hotel to Xinzheng Airport T2",
       "note": "airport runs are often client pickups/drop-offs; AI may suggest purpose=client with a note, but must not invent names"
     }
+  },
+
+  {
+    "file": "tng-faceid-printing-1075.jpg",
+    "layout": "SET 2. TnG Alipay+ 'Payment Result' with a dark 'Face ID' popup covering the middle of the rows: CNY 1,075.00 (thousands comma!), MYR 674.08, Merchant 创意彩印(**燕), Date & Time only shows '/10/2026 19:28:53' (the DAY is hidden under the popup), Exchange Rate shows '= 1.59475879 CNY', Reference No. partly hidden. Sheet row: 'PDL013 Printing' 14/10/2026 RM674.08 ¥1,075.00.",
+    "expect": {
+      "amount_rmb": 1075.0,
+      "amount_myr": 674.08,
+      "rate": 1.59475879,
+      "rate_source": "screenshot",
+      "date": null,
+      "merchant": "创意彩印",
+      "payment_method": "tng",
+      "category": "supplies",
+      "platform": "printing",
+      "purpose": "company",
+      "description_like": "Printing - 创意彩印",
+      "note": "the day is hidden → date must be null with a note, never a guessed day; 1,075.00 must not become 1.075"
+    }
+  },
+  {
+    "file": "tng-lidao-6000.jpg",
+    "layout": "SET 2. TnG Alipay+ 'Payment Result' + notification banner 'You have paid RM3,768.27 (CNY6,000.00) at 李彩霞(**霞)': CNY 6,000.00, MYR 3,768.27, Merchant 李彩霞(**霞) (a PERSON — the local guide 李导), Date & Time 20/10/2026 22:34:36, Exchange Rate 1 MYR = 1.59224109 CNY, Reference 20261020211212800100171444756467315. Sheet row: 'Transfer to Lidao' 20/10/2026 RM3,768.27 ¥6,000.00.",
+    "expect": {
+      "amount_rmb": 6000.0,
+      "amount_myr": 3768.27,
+      "rate": 1.59224109,
+      "rate_source": "screenshot",
+      "date": "2026-10-20",
+      "merchant": "李彩霞",
+      "payment_method": "tng",
+      "category": "guide",
+      "platform": null,
+      "purpose": "company",
+      "description_like": "Transfer to 李彩霞"
+    }
+  },
+  {
+    "file": "tng-lidao-2189.jpg",
+    "layout": "SET 2. Same layout: CNY 2,189.00, MYR 1,375.90, Merchant 李彩霞(**霞), Date & Time 21/10/2026 23:55:49, Exchange Rate 1 MYR = 1.59095423 CNY, Reference 20261021211212800100171448156626962. Sheet row: 'Transfer to Lidao 2' 21/10/2026 RM1,375.90 ¥2,189.00.",
+    "expect": {
+      "amount_rmb": 2189.0,
+      "amount_myr": 1375.9,
+      "rate": 1.59095423,
+      "rate_source": "screenshot",
+      "date": "2026-10-21",
+      "merchant": "李彩霞",
+      "payment_method": "tng",
+      "category": "guide",
+      "purpose": "company",
+      "description_like": "Transfer to 李彩霞"
+    }
+  },
+  {
+    "file": "didi-airport-to-hotel-233.jpg",
+    "layout": "SET 2. Didi 行程已结束: big '¥233.50' with NO 优惠, banner '点击查看预付款使用情况', map, '六座专车 | 全程43.55公里 | 44分钟', lines '15:25 新郑机场-T2-2F-网约车专属上车区' → '16:08 郑州物华豪悦酒店'. No date. Sheet row: 'Didi customer to Hotel' 17/10/2026 RM148.41 ¥233.50.",
+    "expect": {
+      "amount_rmb": 233.5,
+      "amount_myr": null,
+      "rate": null,
+      "date": null,
+      "merchant": "Didi 滴滴",
+      "category": "transport",
+      "platform": "didi",
+      "purpose": "client",
+      "description_like": "Didi - Xinzheng Airport T2 to hotel",
+      "note": "6-seater from the airport to the hotel = customer pickup → purpose client with a note"
+    }
+  },
+  {
+    "file": "meituan-supper-158.jpg",
+    "layout": "SET 2. Meituan 外卖 delivered-order page: '本单已提前10分钟送达', 订单信息 with 配送地址 '美豪丽致酒店 (许昌胖东来综合生产基地店) 徐**(先生)' (delivery address, not the merchant), 商品费用 with shop '炭火匠人·招牌大油边·烧烤·龙虾(许昌店)', 3 food thumbnails, '合计 ¥158.56', then adverts (再省一单). No date on the page. Sheet row: 'Team Supper' 20/10/2026 RM99.42 ¥158.56.",
+    "expect": {
+      "amount_rmb": 158.56,
+      "amount_myr": null,
+      "rate": null,
+      "date": null,
+      "merchant": "炭火匠人",
+      "payment_method": null,
+      "category": "food",
+      "platform": "meituan",
+      "purpose": "team",
+      "description_like": "Team Supper - 烧烤 (Meituan)",
+      "note": "the hotel in 配送地址 is where it was delivered, not the merchant"
+    }
   }
 ]

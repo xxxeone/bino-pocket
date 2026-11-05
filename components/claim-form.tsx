@@ -141,7 +141,7 @@ export function ClaimForm({
 }: {
   initial: ClaimFormValues;
   mode: "create" | "edit";
-  ai?: { confidence: ScanResult["confidence"]; notes: string | null } | null;
+  ai?: { confidence: ScanResult["confidence"]; notes: string | null; verification?: ScanResult["verification"] } | null;
   onSubmit: (v: ClaimFormOutput) => Promise<void>;
   submitLabel?: string;
 }) {
@@ -270,9 +270,21 @@ export function ClaimForm({
           )}
         >
           <Sparkles className="size-4 mt-0.5 shrink-0" />
-          <div>
-            <div className="font-semibold">{ai.confidence === "high" ? "AI: high confidence" : "Please double-check the amounts"}</div>
+          <div className="min-w-0">
+            <div className="font-semibold">
+              {ai.confidence === "high" ? "AI: high confidence" : "Please double-check the amounts"}
+              {ai.verification?.checked && <span className="font-medium opacity-80"> · read twice ✓</span>}
+            </div>
             {ai.notes && <div className="opacity-80 text-xs mt-0.5">{ai.notes}</div>}
+            {ai.verification?.corrections?.length ? (
+              <ul className="text-xs mt-1 space-y-0.5 opacity-90">
+                {ai.verification.corrections.slice(0, 4).map((c, i) => (
+                  <li key={i}>
+                    2nd read fixed <b>{c.field}</b>: {c.from ?? "—"} → {c.to ?? "—"} <span className="opacity-70">({c.why})</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         </div>
       )}

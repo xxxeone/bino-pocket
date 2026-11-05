@@ -1,6 +1,7 @@
 "use client";
 
 import { ClaimForm, emptyValues, valuesFromScan, type ClaimFormOutput, type ClaimFormValues } from "@/components/claim-form";
+import { diffScan } from "@/lib/scan-diff";
 import { ImagePicker, type PickedImage } from "@/components/scan/picker";
 import { ScanningView } from "@/components/scan/scanning";
 import { enqueueOutbox, isNetworkError } from "@/components/scan/outbox";
@@ -19,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 interface Draft {
   id: string;
   values: ClaimFormValues;
-  ai: { confidence: ScanResult["confidence"]; notes: string | null } | null;
+  ai: { confidence: ScanResult["confidence"]; notes: string | null; verification?: ScanResult["verification"] } | null;
   raw: ScanResult | null;
   imageIds: string[];
   done?: "sent" | "offline" | "skipped";
@@ -95,7 +96,7 @@ export default function ScanPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           images: list.map((i) => ({ dataUrl: i.dataUrl })),
-          context: { tripCode: trip!.code, memberCashRate: membership?.cash_rate ?? null, today: todayISO(), knownPlatforms: [] },
+          context: { tripId: trip!.id, tripCode: trip!.code, memberCashRate: membership?.cash_rate ?? null, today: todayISO() },
         }),
       });
       const json = (await res.json()) as { claims?: ScanResult[]; error?: string };
@@ -107,7 +108,7 @@ export default function ScanPage() {
         return {
           id: crypto.randomUUID(),
           values: valuesFromScan(r),
-          ai: { confidence: r.confidence, notes: r.notes },
+          ai: { confidence: r.confidence, notes: r.notes, verification: r.verification },
           raw: r,
           imageIds: idx.map((i) => list[i]?.id).filter(Boolean) as string[],
         };
@@ -135,6 +136,7 @@ export default function ScanPage() {
       ...out,
       ai_confidence: draft.raw?.confidence ?? null,
       ai_raw: draft.raw,
+      ai_corrections: draft.raw ? diffScan(draft.raw, out) : null,
     };
     const imgs = images.filter((i) => draft.imageIds.includes(i.id));
     try {

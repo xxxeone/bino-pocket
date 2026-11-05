@@ -62,6 +62,7 @@ async function run() {
       ["platform", e.platform === undefined || got.platform === e.platform, `${got.platform} vs ${e.platform}`],
       ["payment", e.payment_method === undefined || got.payment_method === e.payment_method, `${got.payment_method} vs ${e.payment_method}`],
       ["merchant", e.merchant === undefined || (got.merchant ?? "").includes(String(e.merchant).split(" ")[0]), `${got.merchant} vs ${e.merchant}`],
+      ["purpose", e.purpose === undefined || got.purpose === e.purpose, `${got.purpose} vs ${e.purpose}`],
     ];
     const bad = checks.filter((x) => !x[1]);
     if (bad.length) fail++;
@@ -69,6 +70,11 @@ async function run() {
     console.log(`${bad.length ? "❌" : "✅"} ${c.file} → "${got.description}" [${got.confidence}] claims=${r.claims.length}`);
     for (const [name, ok, detail] of checks) if (!ok) console.log(`     ✗ ${name}: ${detail}`);
     if (got.notes) console.log(`     note: ${got.notes}`);
+    if (got.verification?.checked) {
+      const v = got.verification;
+      console.log(`     2nd read: ${v.corrections.length} correction(s)${v.issues.length ? `, auto-checks flagged ${v.issues.length}` : ""}`);
+      for (const c of v.corrections) console.log(`       · ${c.field}: ${c.from} → ${c.to} (${c.why})`);
+    }
     console.log(`     tokens in/out: ${r.usage.input_tokens}/${r.usage.output_tokens} (cache read ${r.usage.cache_read_input_tokens ?? 0})`);
   }
 

@@ -57,6 +57,8 @@ export interface Claim {
   late_reason: string | null;
   ai_confidence: string | null;
   ai_raw: unknown;
+  /** What the user changed vs. the AI's suggestion (for prompt tuning). */
+  ai_corrections?: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -105,4 +107,19 @@ export interface ScanResult {
   notes: string | null;
   /** Per-image summary so the user can see what each screenshot contributed. */
   images: { index: number; type: string; amount: number | null; currency: "RMB" | "MYR" | null }[];
+  /** Filled when the second (audit) pass ran. */
+  verification?: ScanVerification;
+}
+
+export interface ScanCorrection {
+  field: string;
+  from: string | null;
+  to: string | null;
+  why: string;
+}
+export interface ScanVerification {
+  checked: boolean;
+  /** Programmatic issues found between the passes (empty = all consistent). */
+  issues: string[];
+  corrections: ScanCorrection[];
 }
