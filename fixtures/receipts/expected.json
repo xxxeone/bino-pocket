@@ -1,0 +1,85 @@
+[
+  {
+    "file": "tng-alipay-plus-printing.jpg",
+    "layout": "Touch 'n Go eWallet — Alipay+ 'Payment Result' page (green tick, 'You've paid', big CNY, small MYR, Merchant / Date & Time / Exchange Rate / eWallet Reference No. / Payment Method rows). An iOS notification banner at the top repeats 'You have paid RM27.01 (CNY43.00) at 创意彩印(**燕)'.",
+    "expect": {
+      "amount_rmb": 43.0,
+      "amount_myr": 27.01,
+      "rate": 1.59240961,
+      "rate_source": "screenshot",
+      "date": "2026-10-10",
+      "merchant": "创意彩印",
+      "payment_method": "tng",
+      "category": "supplies",
+      "platform": "printing",
+      "purpose": "company",
+      "description_like": "Printing - 创意彩印"
+    }
+  },
+  {
+    "file": "klook-esim.jpg",
+    "layout": "Klook 'Receipt' page: order number, 'Booked on: 9 Oct 2026', line item '5G eSIM China | China Unicom · Data per day · 13 days · Unlimited', Payment amount RM 125.55. MYR only, no CNY.",
+    "expect": {
+      "amount_rmb": null,
+      "amount_myr": 125.55,
+      "rate": null,
+      "date": "2026-10-09",
+      "merchant": "Klook",
+      "payment_method": null,
+      "category": "telecom",
+      "platform": "klook",
+      "purpose": "team",
+      "description_like": "Klook eSIM - China Unicom 13 days"
+    }
+  },
+  {
+    "file": "tng-details-gaowen.jpg",
+    "layout": "Touch 'n Go eWallet 'Details' page (blue header): big '-RM208.81', rows Transaction Type: Payment, Merchant: 高文阁(**阁), Foreign Amount: CNY333.00, Exchange Rates: 1 MYR = 1.59475879 CNY, Payment Method: eWallet Balance, Date/Time: 14/10/2026 21:44:23, Wallet Ref, Status: Successful, Transaction No., barcode.",
+    "expect": {
+      "amount_rmb": 333.0,
+      "amount_myr": 208.81,
+      "rate": 1.59475879,
+      "rate_source": "screenshot",
+      "date": "2026-10-14",
+      "merchant": "高文阁",
+      "payment_method": "tng",
+      "category": "food",
+      "platform": "restaurant",
+      "purpose": "team",
+      "description_like": "高文阁"
+    }
+  },
+  {
+    "file": "didi-hotel-to-yumanlou.jpg",
+    "layout": "Didi 滴滴 '行程已结束' (trip ended) page: driver card with rating buttons, then big '¥16.20' with '优惠-¥6.00' (discount ALREADY deducted — ¥16.20 is what was paid), map, '特惠快车 | 全程11.25公里 | 19分钟', then pickup/dropoff lines '18:39 郑州物华豪悦酒店' → '18:58 豫满楼 (郑东新区店)'. NO date on the page — only clock times. Bottom bar 开发票 / 联系客服 / 再来一单.",
+    "expect": {
+      "amount_rmb": 16.2,
+      "amount_myr": null,
+      "rate": null,
+      "date": null,
+      "merchant": "Didi 滴滴",
+      "payment_method": null,
+      "category": "transport",
+      "platform": "didi",
+      "purpose": "team",
+      "description_like": "Didi - 物华豪悦酒店 to 豫满楼",
+      "note": "date falls back to context.today; if paired with a TnG screenshot showing CNY16.20 use that date/MYR/rate"
+    }
+  },
+  {
+    "file": "didi-hotel-to-airport.jpg",
+    "layout": "Same Didi layout: '¥75.30' '优惠-¥9.60', a '点击查看预付款使用情况' banner, '特惠快车 | 全程41.58公里 | 31分钟', '05:45 郑州物华豪悦酒店' → '06:17 郑州新郑国际机场T2航站楼-国内出发3号门'.",
+    "expect": {
+      "amount_rmb": 75.3,
+      "amount_myr": null,
+      "rate": null,
+      "date": null,
+      "merchant": "Didi 滴滴",
+      "category": "transport",
+      "platform": "didi",
+      "purpose": "team",
+      "description_like": "Didi - hotel to Xinzheng Airport T2",
+      "note": "airport runs are often client pickups/drop-offs; AI may suggest purpose=client with a note, but must not invent names"
+    }
+  }
+]

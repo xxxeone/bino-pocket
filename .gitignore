@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# receipt fixtures (personal data)
+/fixtures/receipts/*
+!/fixtures/receipts/expected.json
+!/fixtures/receipts/README.md
+
+# local env
+.env*.local

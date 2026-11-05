@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Bino brand: blue #4192C9 / #2F78AA, navy #153F5C / #0F2F47, orange #E4833B, bg #F6F8FB, Manrope */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f4f7fa;
+  --card: #ffffff;
+  --card-2: #eef3f7;
+  --ink: #0f1b26;
+  --ink-2: #3b4a57;
+  --ink-3: #7f8e9b;
+  --line: #e1e8ee;
+  --brand: #1f86cc;
+  --brand-ink: #ffffff;
+  --brand-soft: #e3f1fb;
+  --amber: #c2410c;
+  --amber-soft: #ffedd5;
+  --green: #15803d;
+  --green-soft: #dcfce7;
+  --rose: #e11d48;
+  --rose-soft: #ffe4e6;
+  --blue: #2f78aa;
+  --blue-soft: #dbeafe;
+  --shadow: 0 1px 2px rgb(15 27 38 / 0.04), 0 8px 24px -12px rgb(15 27 38 / 0.14);
+}
+.dark {
+  --bg: #0b1620;
+  --card: #12222f;
+  --card-2: #192d3d;
+  --ink: #e9f0f6;
+  --ink-2: #a7b8c6;
+  --ink-3: #6c8093;
+  --line: #22384a;
+  --brand: #4fb3f0;
+  --brand-ink: #06202f;
+  --brand-soft: #0f2d42;
+  --amber: #fb923c;
+  --amber-soft: #3a2208;
+  --green: #4ade80;
+  --green-soft: #0f2f1a;
+  --rose: #fb7185;
+  --rose-soft: #3b0f1a;
+  --blue: #7cc4f2;
+  --blue-soft: #0f2140;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  min-height: 100dvh;
 }
+
+/* iOS safe areas */
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* Motion */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { transform: scale(0.92); opacity: 0; } 60% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+@keyframes scanline { 0% { top: 0; } 100% { top: 100%; } }
+.anim-rise { animation: rise 0.28s cubic-bezier(.2,.8,.2,1) both; }
+.anim-pop { animation: pop 0.32s cubic-bezier(.2,.8,.2,1) both; }
+.skeleton {
+  background: linear-gradient(90deg, var(--card-2) 0px, var(--card) 40px, var(--card-2) 80px);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+.scanline::after {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  box-shadow: 0 0 12px var(--brand);
+  animation: scanline 1.6s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise, .anim-pop, .skeleton, .scanline::after { animation: none; }
+}
+
+/* Thin scrollbars on desktop */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
