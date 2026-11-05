@@ -149,3 +149,13 @@ export async function reviewClaim(id: string, status: "approved" | "rejected", r
     .eq("id", id);
   if (error) throw error;
 }
+
+/** Claims by this member in the trip with the same date and the same RMB or MYR amount (duplicate guard). */
+export async function findSimilarClaims(tripId: string, userId: string, date: string, rmb: number | null, myr: number | null): Promise<Claim[]> {
+  if (rmb == null && myr == null) return [];
+  const sb = supabaseBrowser();
+  let q = sb.from("fin_claims").select("*").eq("trip_id", tripId).eq("user_id", userId).eq("date", date).neq("status", "rejected");
+  q = rmb != null ? q.eq("amount_rmb", rmb) : q.eq("amount_myr", myr as number);
+  const { data } = await q.limit(3);
+  return (data ?? []) as Claim[];
+}

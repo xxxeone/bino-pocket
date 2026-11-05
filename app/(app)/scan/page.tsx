@@ -7,7 +7,7 @@ import { ScanningView } from "@/components/scan/scanning";
 import { enqueueOutbox, isNetworkError } from "@/components/scan/outbox";
 import { useApp } from "@/components/providers";
 import { Button, Empty, useToast } from "@/components/ui";
-import { addClaimImages, insertClaim, uploadReceipt, type NewClaim } from "@/lib/data";
+import { addClaimImages, findSimilarClaims, insertClaim, uploadReceipt, type NewClaim } from "@/lib/data";
 import type { ClaimKind, ScanResult } from "@/lib/types";
 import { compressImage, fmtMYR, fmtRMB, todayISO } from "@/lib/utils";
 import confetti from "canvas-confetti";
@@ -196,6 +196,11 @@ export default function ScanPage() {
       ai_corrections: draft.raw ? diffScan(draft.raw, out) : null,
     };
     const imgs = images.filter((i) => draft.imageIds.includes(i.id));
+    // Duplicate guard: same day + same amount already logged by this member (the old sheet had "Didi 4 (duplicate)" rows).
+    const dupes = await findSimilarClaims(trip!.id, profile.id, out.date, out.amount_rmb, out.amount_myr).catch(() => []);
+    if (dupes.length && !window.confirm(`Looks like a duplicate: "${dupes[0].description}" on ${out.date} for the same amount is already logged. Submit anyway?`)) {
+      throw new Error("Not submitted — looks like a duplicate.");
+    }
     try {
       const paths: string[] = [];
       for (const img of imgs) paths.push(await uploadReceipt(trip!.id, profile.id, img.blob));
