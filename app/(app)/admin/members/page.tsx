@@ -7,6 +7,7 @@ import { listProfiles } from "@/lib/data";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import type { Profile, Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { displayLogin, loginEmail, normalizeUsername, USERNAME_RE } from "@/lib/username";
 import { ArrowLeft, Plus } from "lucide-react";
 import Link from "next/link";
 import { useAsync } from "@/lib/use-async";
@@ -26,16 +27,20 @@ export default function MembersPage() {
   }, [error, toast]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Profile | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "member" as Role });
+  const [form, setForm] = useState({ name: "", username: "", password: "", role: "member" as Role });
+  const [newName, setNewName] = useState("");
   const [newPw, setNewPw] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function addMember() {
+    const username = normalizeUsername(form.username);
+    if (!USERNAME_RE.test(username)) return toast("Username: 3–30 letters, numbers, . _ - (no spaces)", "err");
+    if (people.some((p) => displayLogin(p.email) === username)) return toast(`${username} is already taken`, "err");
     setSaving(true);
     const sb = supabaseBrowser();
     try {
       const { data: id, error } = await sb.rpc("fin_admin_create_user", {
-        p_email: form.email.trim(),
+        p_email: loginEmail(username),
         p_password: form.password,
         p_name: form.name.trim(),
         p_role: form.role,
@@ -45,7 +50,7 @@ export default function MembersPage() {
       await sb.from("fin_profiles").update({ color }).eq("id", id as string);
       toast(`${form.name.trim()} added`);
       setAdding(false);
-      setForm({ name: "", email: "", password: "", role: "member" });
+      setForm({ name: "", username: "", password: "", role: "member" });
       await load();
     } catch (e) {
       toast((e as Error).message, "err");
@@ -106,7 +111,10 @@ export default function MembersPage() {
             <button
               key={p.id}
               type="button"
-              onClick={() => setEditing(p)}
+              onClick={() => {
+                setEditing(p);
+                setNewName(p.name);
+              }}
               className={cn("w-full flex items-center gap-3 px-4 py-3 text-left border-b border-line/70 last:border-b-0 active:bg-card-2 transition", !p.active && "opacity-50")}
             >
               <Avatar name={p.name} color={p.color} />
@@ -114,7 +122,7 @@ export default function MembersPage() {
                 <span className="block font-medium truncate">
                   {p.name} {p.id === me.id && <span className="text-ink-3 font-normal">(you)</span>}
                 </span>
-                <span className="block text-xs text-ink-3 truncate">{p.email}</span>
+                <span className="block text-xs text-ink-3 truncate">{displayLogin(p.email)}</span>
               </span>
               <Badge tone={ROLE_TONE[p.role]}>{p.role}</Badge>
               {!p.active && <Badge tone="rose">Off</Badge>}
@@ -134,12 +142,11 @@ export default function MembersPage() {
           <Field label="Name">
             <Input required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Eric" />
           </Field>
-          <Field label="Email">
-            <Input required type="email" inputMode="email" autoCapitalize="none" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="eric@bino.com" />
+          <Field label="Username" hint="They sign in with this. Letters, numbers, . _ - only.">
+            <Input required autoCapitalize="none" autoCorrect="off" spellCheck={false} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="binoeric" />
           </Field>
           <Field label="Password" hint="Min 6 characters. Share it with them; they can keep using it.">
             <Input required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="e.g. Bino2026" />
-            <p className="text-xs text-ink-3 mt-1">If this email already has a Bino CRM login, their existing password is kept — tell them to use that.</p>
           </Field>
           <Field label="Role">
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
@@ -157,7 +164,15 @@ export default function MembersPage() {
       <Sheet open={!!editing} onClose={() => setEditing(null)} title={editing?.name}>
         {editing && (
           <div className="space-y-4">
-            <p className="text-sm text-ink-3 -mt-2">{editing.email}</p>
+            <p className="text-sm text-ink-3 -mt-2">{displayLogin(editing.email)}</p>
+            <Field label="Name">
+              <div className="flex gap-2">
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" />
+                <Button variant="secondary" disabled={!newName.trim() || newName.trim() === editing.name} onClick={() => void patch(editing, { name: newName.trim() })}>
+                  Save
+                </Button>
+              </div>
+            </Field>
             <Field label="Role">
               <Select value={editing.role} disabled={editing.id === me.id} onChange={(e) => void patch(editing, { role: e.target.value as Role })}>
                 <option value="member">Member</option>

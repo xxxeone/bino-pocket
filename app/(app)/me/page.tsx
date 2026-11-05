@@ -5,6 +5,7 @@ import { Avatar, Badge, Button, Card, Field, Input, PageHeader, Select, useToast
 import { setMyCashRate } from "@/lib/data";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { displayLogin } from "@/lib/username";
 import { BarChart3, ChevronRight, LogOut, Monitor, Moon, Settings2, Share, Sun } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,16 @@ export default function MePage() {
   const router = useRouter();
   const [theme, setTheme] = useState<Theme>("system");
   const [rate, setRate] = useState("");
+  const [name, setName] = useState(profile.name);
+
+  async function saveName() {
+    const n = name.trim();
+    if (!n) return;
+    const { error } = await supabaseBrowser().from("fin_profiles").update({ name: n }).eq("id", profile.id);
+    if (error) return toast(error.message, "err");
+    toast("Name saved");
+    router.refresh();
+  }
   const [isIOS, setIsIOS] = useState(false);
   const [standalone, setStandalone] = useState(true);
 
@@ -65,12 +76,20 @@ export default function MePage() {
           <Avatar name={profile.name} color={profile.color} size={52} />
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-lg truncate">{profile.name}</p>
-            <p className="text-sm text-ink-3 truncate">{profile.email}</p>
+            <p className="text-sm text-ink-3 truncate">{displayLogin(profile.email)}</p>
           </div>
           <Badge tone={profile.role === "admin" ? "brand" : profile.role === "lead" ? "blue" : "neutral"}>{profile.role}</Badge>
         </Card>
 
         <Card className="p-4 space-y-4">
+          <Field label="My name">
+            <div className="flex gap-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+              <Button variant="secondary" onClick={() => void saveName()} disabled={!name.trim() || name.trim() === profile.name}>
+                Save
+              </Button>
+            </div>
+          </Field>
           <Field label="Current trip">
             <Select value={trip?.id ?? ""} onChange={(e) => setTripId(e.target.value)}>
               {trips.length === 0 && <option value="">No trips yet</option>}
