@@ -21,6 +21,7 @@ export function BottomNav() {
         { href: "/", label: "Home", Icon: Home },
         { href: "/claims", label: "Claims", Icon: ReceiptText },
         { href: "/scan", label: "Scan", Icon: ScanLine, fab: true },
+        { href: "/report", label: "Summary", Icon: BarChart3 },
         { href: "/me", label: "Me", Icon: UserRound },
       ];
   if (path.startsWith("/scan")) return null;
@@ -32,7 +33,7 @@ export function BottomNav() {
             const active = href === "/" ? path === "/" : path.startsWith(href);
             if (fab)
               return (
-                <Link key={href} href={href} className="relative -mt-5 flex flex-col items-center justify-start px-3" aria-label="Scan receipt">
+                <Link key={href} href={href} className="relative -mt-5 flex flex-1 flex-col items-center justify-start" aria-label="Scan receipt">
                   <span className="size-14 rounded-full bg-brand text-brand-ink grid place-items-center shadow-[0_8px_24px_-6px_var(--brand)] active:scale-95 transition">
                     <Icon className="size-7" />
                   </span>
@@ -43,7 +44,7 @@ export function BottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={cn("flex flex-col items-center justify-center gap-0.5 px-3 text-[11px] font-medium transition", active ? "text-brand" : "text-ink-3")}
+                className={cn("flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition", active ? "text-brand" : "text-ink-3")}
               >
                 <Icon className={cn("size-6", active && "fill-brand/15")} />
                 {label}
