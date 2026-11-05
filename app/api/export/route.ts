@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 type Row = ClaimWithPeople & { reviewer: { id: string; name: string } | null; images: { id: string; drive_url: string | null }[] };
 
 const GREEN = "FF1E6B52";
+const round2 = (n: number) => Math.round(n * 100) / 100;
 const HEADER = ["No.", "Items & Description", "Date", "RM", "RMB", "Conversion Rate", "Reviewed", "Reviewed by", "Category", "Purpose", "Payment", "Receipt"];
 const WIDTHS = [6, 42, 13, 14, 14, 16, 10, 14, 18, 14, 18, 9];
 
@@ -117,9 +118,9 @@ function summarySheet(wb: ExcelJS.Workbook, trip: Trip, rows: Row[], members: Pe
   for (const p of report.people) {
     const r = ws.addRow([
       p.user.name,
-      p.cash_in_myr + p.transfers_in_myr,
-      p.expenses_myr + p.transfers_out_myr,
-      p.balance_myr,
+      round2(p.cash_in_myr + p.transfers_in_myr),
+      round2(p.expenses_myr + p.transfers_out_myr),
+      round2(p.balance_myr),
       p.items_count,
       p.pending_count,
     ]);
