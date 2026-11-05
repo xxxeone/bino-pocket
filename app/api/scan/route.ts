@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   try {
     const r = await scanImages(parsed, { tripCode: ctx.tripCode, memberCashRate: ctx.memberCashRate, today, hints, verify: ctx.verify });
     if (!r.ok) return Response.json({ error: r.error }, { status: r.status });
-    return Response.json({ result: r.claims[0], claims: r.claims, meta: { prompt: r.promptVersion, usage: r.usage, passes: r.passes } });
+    return Response.json({ result: r.claims[0], claims: r.claims, meta: { prompt: r.promptVersion, usage: r.usage, passes: r.passes, models: r.models } });
   } catch (err) {
     console.error("scan failed", err);
     return Response.json({ error: "Scan failed" }, { status: 500 });

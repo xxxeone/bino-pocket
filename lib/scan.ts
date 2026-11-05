@@ -15,7 +15,15 @@ import { CATEGORIES, PAYMENT_METHODS, PLATFORMS } from "./constants";
 import { SCAN_PROMPT_VERSION, SCAN_SYSTEM_PROMPT, SCAN_VERIFY_PROMPT } from "./scan-prompt";
 import type { ScanCorrection, ScanResult, ScanVerification } from "./types";
 
-export const SCAN_MODEL = "claude-opus-5-5";
+/**
+ * Models. Haiku 5.5 reads receipts at ~1/40 of Opus' input price; the audit pass
+ * escalates to the stronger model only when the checks flag a problem or the
+ * first read is not fully confident. Override per environment:
+ *   SCAN_MODEL        first read            (default claude-haiku-5-5)
+ *   SCAN_AUDIT_MODEL  audit when in doubt   (default claude-opus-5-5)
+ */
+export const SCAN_MODEL = process.env.SCAN_MODEL || "claude-haiku-5-5";
+export const SCAN_AUDIT_MODEL = process.env.SCAN_AUDIT_MODEL || "claude-opus-5-5";
 export const MAX_IMAGES = 6;
 export const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -83,7 +91,7 @@ export function parseDataUrl(dataUrl: string): { media: Media; data: string } | 
 }
 
 export type ScanOutcome =
-  | { ok: true; claims: ScanResult[]; usage: Anthropic.Usage; promptVersion: string; passes: number }
+  | { ok: true; claims: ScanResult[]; usage: Anthropic.Usage; promptVersion: string; passes: number; models: string[] }
   | { ok: false; status: number; error: string };
 
 type RawClaim = z.infer<typeof ClaimSchema>;
@@ -177,15 +185,20 @@ export async function scanImages(images: { media: Media; data: string }[], ctx: 
     let claims = m1.parsed_output.claims.map(normalize);
     let usage = m1.usage;
     let passes = 1;
+    const models = [SCAN_MODEL];
     const issues = checkClaims(claims, images.length, ctx.today);
     let verification: ScanVerification = { checked: false, issues, corrections: [] };
 
     if (ctx.verify !== false) {
+      // Escalate the audit to the stronger model when something looks off.
+      const inDoubt = issues.length > 0 || claims.some((c) => c.confidence !== "high");
+      const auditModel = inDoubt ? SCAN_AUDIT_MODEL : SCAN_MODEL;
+      models.push(auditModel);
       const auditText = issues.length
         ? `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks flagged these problems — resolve each one:\n${issues.map((s) => `- ${s}`).join("\n")}`
         : `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks found no inconsistencies; still re-read every number.`;
       const m2 = await client.messages.parse({
-        model: SCAN_MODEL,
+        model: auditModel,
         max_tokens: 6000,
         output_config: { effort: "high", format: zodOutputFormat(VerifySchema) },
         system,
@@ -206,7 +219,7 @@ export async function scanImages(images: { media: Media; data: string }[], ctx: 
     }
 
     claims = claims.map((c) => ({ ...c, verification }));
-    return { ok: true, claims, usage, promptVersion: SCAN_PROMPT_VERSION, passes };
+    return { ok: true, claims, usage, promptVersion: SCAN_PROMPT_VERSION, passes, models };
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) return { ok: false, status: 500, error: "AI not configured (bad API key)" };
     if (err instanceof Anthropic.RateLimitError) return { ok: false, status: 429, error: "AI is busy, try again in a moment" };

@@ -52,7 +52,7 @@ No environment variables and no redeploy needed. The connection is stored in `fi
 ANTHROPIC_API_KEY=sk-ant-… npx tsx scripts/scan-eval.ts
 ```
 
-Cost: roughly US$0.02–0.05 per scan (images are compressed to ≤1600px client-side; the system prompt is cached).
+Models: the first read uses **Claude Haiku 5.5** (`SCAN_MODEL`, ~US$0.002 per scan) and the second "audit" read re-checks every number against the same images; when the automatic checks flag a problem or the first read isn't fully confident, the audit escalates to **Claude Opus 5.5** (`SCAN_AUDIT_MODEL`, ~US$0.04 for that scan). Typical trip of 300 claims ≈ US$1–3. Set `SCAN_MODEL=claude-opus-5-5` in Netlify if you ever want maximum accuracy on every scan.
 
 ## 5. Rules & gamification
 
