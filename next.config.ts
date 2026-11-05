@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Fully dynamic, authenticated app: keep the classic rendering model.
   cacheComponents: false,
+  devIndicators: false,
   partialPrefetching: false,
   turbopack: {
     rules: {
