@@ -1,7 +1,7 @@
 /* Bino Pocket service worker — app-shell cache so the PWA opens instantly
    (and still opens with no network). Data always comes from the network. */
 const VERSION = "bp-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/logo.png"];
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/brand/logo.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting()));

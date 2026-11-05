@@ -163,6 +163,7 @@ export function ClaimForm({
   const [members, setMembers] = useState<Profile[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [flash, setFlash] = useState(0);
   const today = todayISO();
   const isLate = v.date < today;
 
@@ -305,7 +306,10 @@ export function ClaimForm({
                 {ai.suggestion && (
                   <button
                     type="button"
-                    onClick={() => setV(applyCashRate(ai.suggestion!, cashRate))}
+                    onClick={() => {
+                      setV(applyCashRate(ai.suggestion!, cashRate));
+                      setFlash((f) => f + 1);
+                    }}
                     className="mt-2 h-8 px-3 rounded-full bg-brand text-brand-ink text-xs font-bold active:scale-95 transition"
                   >
                     Apply the fixes
@@ -318,7 +322,7 @@ export function ClaimForm({
       )}
 
       {/* Amounts */}
-      <div className="bg-card rounded-2xl shadow-card border border-line/60 p-4">
+      <div key={flash} className={cn("bg-card rounded-2xl shadow-card border border-line/60 p-4", flash > 0 && "anim-flash")}>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">MYR</span>

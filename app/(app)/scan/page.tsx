@@ -414,14 +414,26 @@ function toOutput(v: ClaimFormValues): ClaimFormOutput {
 }
 
 function Thumbs({ images }: { images: PickedImage[] }) {
+  const [open, setOpen] = useState<string | null>(null);
   if (!images.length) return null;
   return (
-    <div className="flex gap-1.5 mb-4 overflow-x-auto">
-      {images.map((img, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={img.id} src={img.dataUrl} alt={`Screenshot ${i + 1}`} className="h-16 w-12 object-cover rounded-lg bg-card-2 shrink-0" />
-      ))}
-    </div>
+    <>
+      <div className="flex gap-2 mb-4 overflow-x-auto py-0.5">
+        {images.map((img, i) => (
+          <button key={img.id} type="button" onClick={() => setOpen(img.dataUrl)} className="relative shrink-0 rounded-xl overflow-hidden ring-1 ring-line shadow-sm active:scale-95 transition" aria-label={`View screenshot ${i + 1}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={img.dataUrl} alt="" className="h-20 w-14 object-cover bg-card-2" />
+            <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-black/55 text-white rounded-full px-1.5">{i + 1}</span>
+          </button>
+        ))}
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-black/90 grid place-items-center p-4 anim-pop" onClick={() => setOpen(null)} role="dialog" aria-modal>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={open} alt="Screenshot" className="max-h-full max-w-full rounded-2xl object-contain" />
+        </div>
+      )}
+    </>
   );
 }
 

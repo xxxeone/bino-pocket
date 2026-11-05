@@ -12,6 +12,7 @@ import { CheckCircle2, ChevronRight, Flame, ScanLine, Sparkles } from "lucide-re
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { InstallBanner } from "@/components/install-banner";
+import { AnimatedNumber } from "@/components/animated-number";
 
 export default function HomePage() {
   const { profile, trip, tripsLoading, isReviewer } = useApp();
@@ -119,7 +120,7 @@ export default function HomePage() {
               )}
             </div>
             <div className="mt-1 text-[36px] font-extrabold tracking-tight tabular-nums leading-none">
-              {fmtMYR(isReviewer ? stats.tripSpent : stats.mySpent)}
+              <AnimatedNumber value={isReviewer ? stats.tripSpent : stats.mySpent} format={fmtMYR} />
             </div>
             <div className="text-[13px] text-ink-3 mt-2">
               {isReviewer ? (
@@ -146,7 +147,7 @@ export default function HomePage() {
             <Card className="p-4">
               <div className="text-xs font-semibold text-ink-3">{isReviewer ? "My claims" : "Today"}</div>
               <div className="text-[22px] font-extrabold tabular-nums mt-0.5">
-                {isReviewer ? fmtMYR(stats.mySpent) : `${stats.todayCount} receipt${stats.todayCount === 1 ? "" : "s"}`}
+                {isReviewer ? <AnimatedNumber value={stats.mySpent} format={fmtMYR} /> : `${stats.todayCount} receipt${stats.todayCount === 1 ? "" : "s"}`}
               </div>
             </Card>
             <Card className="p-4">

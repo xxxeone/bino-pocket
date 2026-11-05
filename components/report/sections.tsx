@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedNumber } from "@/components/animated-number";
+
 import { Avatar, Badge, Card, StatusBadge } from "@/components/ui";
 import { CATEGORIES, optionEmoji } from "@/lib/constants";
 import type { FunStats, PersonTotals, Report } from "@/lib/report";
@@ -45,7 +47,9 @@ export function Hero({
           ))}
         </div>
       </div>
-      <div className="mt-2 text-[38px] font-extrabold tracking-tight tabular-nums leading-none">{fmtMYR(totals.spent_myr)}</div>
+      <div className="mt-2 text-[38px] font-extrabold tracking-tight tabular-nums leading-none">
+        <AnimatedNumber value={totals.spent_myr} format={fmtMYR} />
+      </div>
       <div className="text-[13px] text-ink-3 mt-2 flex items-center gap-2 flex-wrap">
         <span>≈ {fmtRMB(totals.spent_rmb)}</span>
         <span>·</span>

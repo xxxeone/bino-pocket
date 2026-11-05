@@ -179,8 +179,18 @@ export function Avatar({ name, color, size = 36, className }: { name: string; co
 }
 
 /* ---------- Spinner / Empty ---------- */
-export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn("size-5 animate-spin text-ink-3", className)} />;
+/** Three Bino-blue dots. */
+export function Spinner({ className, label }: { className?: string; label?: string }) {
+  return (
+    <div className={cn("inline-flex flex-col items-center gap-3", className)} role="status" aria-label={label ?? "Loading"}>
+      <div className="flex items-center gap-1.5">
+        <span className="dot" />
+        <span className="dot" style={{ animationDelay: "120ms" }} />
+        <span className="dot" style={{ animationDelay: "240ms" }} />
+      </div>
+      {label && <span className="text-sm text-ink-3">{label}</span>}
+    </div>
+  );
 }
 export function Empty({ emoji = "🗒️", title, hint, action }: { emoji?: string; title: string; hint?: string; action?: ReactNode }) {
   return (
