@@ -188,7 +188,12 @@ const firstTurn = (parts: Anthropic.ImageBlockParam[], userText: string): Anthro
 const SYSTEM: Anthropic.TextBlockParam[] = [{ type: "text", text: SCAN_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }];
 
 function apiError(err: unknown): { ok: false; status: number; error: string } {
-  if (err instanceof Anthropic.AuthenticationError) return { ok: false, status: 500, error: "AI not configured (bad API key)" };
+  if (err instanceof Anthropic.AuthenticationError) {
+    const k = process.env.ANTHROPIC_API_KEY ?? "";
+    // Diagnostics only: never log the key itself.
+    console.error("[scan] Anthropic auth failed", { message: err.message, envBaseUrl: process.env.ANTHROPIC_BASE_URL ?? null, keyLen: k.length, keyPrefix: k.slice(0, 10) });
+    return { ok: false, status: 500, error: "AI not configured (bad API key)" };
+  }
   if (err instanceof Anthropic.RateLimitError) return { ok: false, status: 429, error: "AI is busy, try again in a moment" };
   if (err instanceof Anthropic.BadRequestError) return { ok: false, status: 400, error: `AI rejected the request: ${err.message}` };
   if (err instanceof Anthropic.APIConnectionError) return { ok: false, status: 502, error: "Could not reach the AI service" };

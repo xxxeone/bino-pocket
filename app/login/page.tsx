@@ -2,13 +2,14 @@
 
 import { Button, Input, Label } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { loginEmail } from "@/lib/username";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,10 +18,10 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabaseBrowser().auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabaseBrowser().auth.signInWithPassword({ email: loginEmail(username), password });
     setLoading(false);
     if (error) {
-      setError("Wrong email or password.");
+      setError("Wrong username or password.");
       return;
     }
     router.replace(params.get("next") || "/");
@@ -30,8 +31,8 @@ function LoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@bino.com" />
+        <Label htmlFor="username">Username</Label>
+        <Input id="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="binoeric" />
       </div>
       <div>
         <Label htmlFor="password">Password</Label>

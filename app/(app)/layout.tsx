@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/bottom-nav";
+import { displayLogin } from "@/lib/username";
 import { AppProvider } from "@/components/providers";
 import { supabaseServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -15,7 +16,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     .select("id,email,name,role,color,active")
     .eq("id", user.id)
     .maybeSingle();
-  if (!profile || !profile.active) return <NotInvited email={user.email ?? ""} />;
+  if (!profile || !profile.active) return <NotInvited email={displayLogin(user.email)} />;
 
   return (
     <AppProvider profile={profile}>
