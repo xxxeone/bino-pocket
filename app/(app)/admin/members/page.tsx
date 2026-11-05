@@ -139,6 +139,7 @@ export default function MembersPage() {
           </Field>
           <Field label="Password" hint="Min 6 characters. Share it with them; they can keep using it.">
             <Input required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="e.g. Bino2026" />
+            <p className="text-xs text-ink-3 mt-1">If this email already has a Bino CRM login, their existing password is kept — tell them to use that.</p>
           </Field>
           <Field label="Role">
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>

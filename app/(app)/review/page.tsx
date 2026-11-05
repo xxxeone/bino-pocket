@@ -17,7 +17,7 @@ const TABS: { id: ClaimStatus; label: string }[] = [
 ];
 
 export default function ReviewPage() {
-  const { profile, trip, isReviewer } = useApp();
+  const { profile, trip, isReviewer, isAdmin } = useApp();
   const toast = useToast();
   const [tab, setTab] = useState<ClaimStatus>("pending");
   const {
@@ -53,7 +53,8 @@ export default function ReviewPage() {
     return [...m.values()];
   }, [claims]);
 
-  const canAct = (c: ClaimWithPeople) => tab === "pending" && c.user_id !== profile.id;
+  // Leads cannot approve their own claims; an admin can (they are the final authority on a trip).
+  const canAct = (c: ClaimWithPeople) => tab === "pending" && (c.user_id !== profile.id || isAdmin);
   const actionable = claims.filter(canAct);
 
   async function act(ids: string[], status: "approved" | "rejected", why?: string) {

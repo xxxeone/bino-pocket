@@ -90,6 +90,19 @@ export function parseDataUrl(dataUrl: string): { media: Media; data: string } | 
   return { media: media as Media, data };
 }
 
+/** Validate the client's data URLs (count, type, size). */
+export function parseImages(images: { dataUrl?: string }[]): { media: Media; data: string }[] | { error: string; status: number } {
+  if (!images.length) return { error: "No images", status: 400 };
+  if (images.length > MAX_IMAGES) return { error: `Max ${MAX_IMAGES} images per scan`, status: 400 };
+  const parsed: { media: Media; data: string }[] = [];
+  for (const img of images) {
+    const p = parseDataUrl(img.dataUrl ?? "");
+    if ("error" in p) return p;
+    parsed.push(p);
+  }
+  return parsed;
+}
+
 export type ScanOutcome =
   | { ok: true; claims: ScanResult[]; usage: Anthropic.Usage; promptVersion: string; passes: number; models: string[] }
   | { ok: false; status: number; error: string };
@@ -146,12 +159,46 @@ const sumUsage = (a: Anthropic.Usage, b: Anthropic.Usage): Anthropic.Usage => ({
   cache_read_input_tokens: (a.cache_read_input_tokens ?? 0) + (b.cache_read_input_tokens ?? 0),
 });
 
-/** Run the model over the images. Throws only on programmer error; API errors come back as {ok:false}. */
-export async function scanImages(images: { media: Media; data: string }[], ctx: ScanContext, client = new Anthropic()): Promise<ScanOutcome> {
-  const parts: Anthropic.ImageBlockParam[] = images.map((p) => ({
-    type: "image",
-    source: { type: "base64", media_type: p.media, data: p.data },
-  }));
+export interface AuditState {
+  /** The exact first-turn instructions, so the audit request reproduces the cached prefix byte-for-byte. */
+  userText: string;
+  /** Pass-1 assistant content, passed back unchanged. */
+  assistant: Anthropic.ContentBlock[];
+  /** Escalate to the stronger model? (issues found or confidence < high) */
+  inDoubt: boolean;
+}
+
+export type FirstOutcome =
+  | { ok: true; claims: ScanResult[]; issues: string[]; usage: Anthropic.Usage; model: string; promptVersion: string; audit: AuditState }
+  | { ok: false; status: number; error: string };
+
+export type AuditOutcome =
+  | { ok: true; claims: ScanResult[]; corrections: ScanCorrection[]; usage: Anthropic.Usage; model: string }
+  | { ok: false; status: number; error: string };
+
+const toParts = (images: { media: Media; data: string }[]): Anthropic.ImageBlockParam[] =>
+  images.map((p) => ({ type: "image", source: { type: "base64", media_type: p.media, data: p.data } }));
+
+const firstTurn = (parts: Anthropic.ImageBlockParam[], userText: string): Anthropic.MessageParam => ({
+  role: "user",
+  // The whole first turn (system + images + instructions) is cached so the audit pass re-reads it cheaply.
+  content: [...parts, { type: "text", text: userText, cache_control: { type: "ephemeral" } }],
+});
+
+const SYSTEM: Anthropic.TextBlockParam[] = [{ type: "text", text: SCAN_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }];
+
+function apiError(err: unknown): { ok: false; status: number; error: string } {
+  if (err instanceof Anthropic.AuthenticationError) return { ok: false, status: 500, error: "AI not configured (bad API key)" };
+  if (err instanceof Anthropic.RateLimitError) return { ok: false, status: 429, error: "AI is busy, try again in a moment" };
+  if (err instanceof Anthropic.BadRequestError) return { ok: false, status: 400, error: `AI rejected the request: ${err.message}` };
+  if (err instanceof Anthropic.APIConnectionError) return { ok: false, status: 502, error: "Could not reach the AI service" };
+  if (err instanceof Anthropic.APIError) return { ok: false, status: 502, error: `AI error ${err.status ?? ""}: ${err.message}` };
+  throw err;
+}
+
+/** Pass 1: read the images. Fast; the client shows this immediately. */
+export async function scanFirst(images: { media: Media; data: string }[], ctx: ScanContext, client = new Anthropic()): Promise<FirstOutcome> {
+  const parts = toParts(images);
   const userText = [
     `Today: ${ctx.today}.`,
     ctx.tripCode ? `Trip: ${ctx.tripCode}.` : "",
@@ -164,70 +211,72 @@ export async function scanImages(images: { media: Media; data: string }[], ctx: 
     .filter(Boolean)
     .join(" ");
 
-  // The whole first turn (system + images + instructions) is cached so the audit pass re-reads it cheaply.
-  const firstTurn: Anthropic.MessageParam = {
-    role: "user",
-    content: [...parts, { type: "text", text: userText, cache_control: { type: "ephemeral" } }],
-  };
-  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: SCAN_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }];
-
   try {
     const m1 = await client.messages.parse({
       model: SCAN_MODEL,
       max_tokens: 6000,
       output_config: { effort: "high", format: zodOutputFormat(ScanSchema) },
-      system,
-      messages: [firstTurn],
+      system: SYSTEM,
+      messages: [firstTurn(parts, userText)],
     });
     if (m1.stop_reason === "refusal") return { ok: false, status: 422, error: "The AI declined to read these images. Please type the claim manually." };
     if (!m1.parsed_output?.claims.length) return { ok: false, status: 502, error: "AI returned an unreadable result. Try again or type manually." };
-
-    let claims = m1.parsed_output.claims.map(normalize);
-    let usage = m1.usage;
-    let passes = 1;
-    const models = [SCAN_MODEL];
+    const claims = m1.parsed_output.claims.map(normalize);
     const issues = checkClaims(claims, images.length, ctx.today);
-    let verification: ScanVerification = { checked: false, issues, corrections: [] };
-
-    if (ctx.verify !== false) {
-      // Escalate the audit to the stronger model when something looks off.
-      const inDoubt = issues.length > 0 || claims.some((c) => c.confidence !== "high");
-      const auditModel = inDoubt ? SCAN_AUDIT_MODEL : SCAN_MODEL;
-      models.push(auditModel);
-      const auditText = issues.length
-        ? `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks flagged these problems — resolve each one:\n${issues.map((s) => `- ${s}`).join("\n")}`
-        : `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks found no inconsistencies; still re-read every number.`;
-      const m2 = await client.messages.parse({
-        model: auditModel,
-        max_tokens: 6000,
-        output_config: { effort: "high", format: zodOutputFormat(VerifySchema) },
-        system,
-        messages: [firstTurn, { role: "assistant", content: m1.content }, { role: "user", content: auditText }],
-      });
-      usage = sumUsage(usage, m2.usage);
-      passes = 2;
-      if (m2.stop_reason !== "refusal" && m2.parsed_output?.claims.length) {
-        claims = m2.parsed_output.claims.map(normalize);
-        const corrections: ScanCorrection[] = m2.parsed_output.corrections.map((c) => ({
-          field: claims.length > 1 ? `claim ${c.claim + 1} ${c.field}` : c.field,
-          from: c.from,
-          to: c.to,
-          why: c.why,
-        }));
-        verification = { checked: true, issues, corrections };
-      }
-    }
-
-    claims = claims.map((c) => ({ ...c, verification }));
-    return { ok: true, claims, usage, promptVersion: SCAN_PROMPT_VERSION, passes, models };
+    const inDoubt = issues.length > 0 || claims.some((c) => c.confidence !== "high");
+    const verification: ScanVerification = { checked: false, issues, corrections: [] };
+    return {
+      ok: true,
+      claims: claims.map((c) => ({ ...c, verification })),
+      issues,
+      usage: m1.usage,
+      model: SCAN_MODEL,
+      promptVersion: SCAN_PROMPT_VERSION,
+      audit: { userText, assistant: m1.content, inDoubt },
+    };
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) return { ok: false, status: 500, error: "AI not configured (bad API key)" };
-    if (err instanceof Anthropic.RateLimitError) return { ok: false, status: 429, error: "AI is busy, try again in a moment" };
-    if (err instanceof Anthropic.BadRequestError) return { ok: false, status: 400, error: `AI rejected the request: ${err.message}` };
-    if (err instanceof Anthropic.APIConnectionError) return { ok: false, status: 502, error: "Could not reach the AI service" };
-    if (err instanceof Anthropic.APIError) return { ok: false, status: 502, error: `AI error ${err.status ?? ""}: ${err.message}` };
-    throw err;
+    return apiError(err);
   }
+}
+
+/** Pass 2: the model audits pass 1 against the same images; escalates to the stronger model when in doubt. */
+export async function scanAudit(images: { media: Media; data: string }[], audit: AuditState, issues: string[], client = new Anthropic()): Promise<AuditOutcome> {
+  const parts = toParts(images);
+  const model = audit.inDoubt ? SCAN_AUDIT_MODEL : SCAN_MODEL;
+  const auditText = issues.length
+    ? `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks flagged these problems — resolve each one:\n${issues.map((s) => `- ${s}`).join("\n")}`
+    : `${SCAN_VERIFY_PROMPT}\n\nAutomatic checks found no inconsistencies; still re-read every number.`;
+  try {
+    const m2 = await client.messages.parse({
+      model,
+      max_tokens: 6000,
+      output_config: { effort: "high", format: zodOutputFormat(VerifySchema) },
+      system: SYSTEM,
+      messages: [firstTurn(parts, audit.userText), { role: "assistant", content: audit.assistant }, { role: "user", content: auditText }],
+    });
+    if (m2.stop_reason === "refusal" || !m2.parsed_output?.claims.length) return { ok: false, status: 502, error: "Audit pass returned nothing usable" };
+    const claims = m2.parsed_output.claims.map(normalize);
+    const corrections: ScanCorrection[] = m2.parsed_output.corrections.map((c) => ({
+      field: claims.length > 1 ? `claim ${c.claim + 1} ${c.field}` : c.field,
+      from: c.from,
+      to: c.to,
+      why: c.why,
+    }));
+    const verification: ScanVerification = { checked: true, issues, corrections };
+    return { ok: true, claims: claims.map((c) => ({ ...c, verification })), corrections, usage: m2.usage, model };
+  } catch (err) {
+    return apiError(err);
+  }
+}
+
+/** Both passes in one call (eval script / tests). */
+export async function scanImages(images: { media: Media; data: string }[], ctx: ScanContext, client = new Anthropic()): Promise<ScanOutcome> {
+  const first = await scanFirst(images, ctx, client);
+  if (!first.ok) return first;
+  if (ctx.verify === false) return { ok: true, claims: first.claims, usage: first.usage, promptVersion: first.promptVersion, passes: 1, models: [first.model] };
+  const second = await scanAudit(images, first.audit, first.issues, client);
+  if (!second.ok) return { ok: true, claims: first.claims, usage: first.usage, promptVersion: first.promptVersion, passes: 1, models: [first.model] };
+  return { ok: true, claims: second.claims, usage: sumUsage(first.usage, second.usage), promptVersion: first.promptVersion, passes: 2, models: [first.model, second.model] };
 }
 
 /**

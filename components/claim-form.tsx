@@ -6,8 +6,19 @@ import { CATEGORIES, PAYMENT_METHODS, PLATFORMS, PURPOSES, optionEmoji, optionLa
 import { listTripMembers } from "@/lib/data";
 import type { ClaimKind, Profile, Purpose, ScanResult } from "@/lib/types";
 import { cn, fmtDateShort, fmtRate, round, todayISO } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, Sparkles } from "lucide-react";
+import { AlertTriangle, ChevronDown, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+
+/** What the scanner knows about this claim (shown in the pill above the form). */
+export interface ClaimAi {
+  confidence: ScanResult["confidence"];
+  notes: string | null;
+  verification?: ScanResult["verification"];
+  /** Second read still running. */
+  auditing?: boolean;
+  /** Values from the second read when it changed something — applied only when the user taps Apply. */
+  suggestion?: ClaimFormValues | null;
+}
 
 /** Editable form state. Amounts are strings so the user can type freely. */
 export interface ClaimFormValues {
@@ -141,7 +152,7 @@ export function ClaimForm({
 }: {
   initial: ClaimFormValues;
   mode: "create" | "edit";
-  ai?: { confidence: ScanResult["confidence"]; notes: string | null; verification?: ScanResult["verification"] } | null;
+  ai?: ClaimAi | null;
   onSubmit: (v: ClaimFormOutput) => Promise<void>;
   submitLabel?: string;
 }) {
@@ -270,21 +281,38 @@ export function ClaimForm({
           )}
         >
           <Sparkles className="size-4 mt-0.5 shrink-0" />
-          <div className="min-w-0">
-            <div className="font-semibold">
-              {ai.confidence === "high" ? "AI: high confidence" : "Please double-check the amounts"}
-              {ai.verification?.checked && <span className="font-medium opacity-80"> · read twice ✓</span>}
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold flex items-center gap-2 flex-wrap">
+              <span>{ai.confidence === "high" ? "AI: high confidence" : "Please double-check the amounts"}</span>
+              {ai.auditing ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium opacity-80">
+                  <Loader2 className="size-3 animate-spin" /> reading again…
+                </span>
+              ) : ai.verification?.checked ? (
+                <span className="text-xs font-medium opacity-80">read twice ✓</span>
+              ) : null}
             </div>
             {ai.notes && <div className="opacity-80 text-xs mt-0.5">{ai.notes}</div>}
-            {ai.verification?.corrections?.length ? (
-              <ul className="text-xs mt-1 space-y-0.5 opacity-90">
-                {ai.verification.corrections.slice(0, 4).map((c, i) => (
-                  <li key={i}>
-                    2nd read fixed <b>{c.field}</b>: {c.from ?? "—"} → {c.to ?? "—"} <span className="opacity-70">({c.why})</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            {ai.verification?.checked && ai.verification.corrections.length > 0 && (
+              <div className="mt-1.5">
+                <ul className="text-xs space-y-0.5 opacity-90">
+                  {ai.verification.corrections.slice(0, 4).map((c, i) => (
+                    <li key={i}>
+                      2nd read: <b>{c.field}</b> {c.from ?? "—"} → <b>{c.to ?? "—"}</b> <span className="opacity-70">({c.why})</span>
+                    </li>
+                  ))}
+                </ul>
+                {ai.suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setV(applyCashRate(ai.suggestion!, cashRate))}
+                    className="mt-2 h-8 px-3 rounded-full bg-brand text-brand-ink text-xs font-bold active:scale-95 transition"
+                  >
+                    Apply the fixes
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

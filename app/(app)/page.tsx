@@ -10,13 +10,20 @@ import { useAsync } from "@/lib/use-async";
 import { cn, fmtMYR, fmtRMB, streakFrom, todayISO } from "@/lib/utils";
 import { CheckCircle2, ChevronRight, Flame, ScanLine, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { InstallBanner } from "@/components/install-banner";
 
 export default function HomePage() {
   const { profile, trip, tripsLoading, isReviewer } = useApp();
   const toast = useToast();
   const [checking, setChecking] = useState(false);
   const today = todayISO();
+  const hour = useSyncExternalStore(
+    () => () => {},
+    () => new Date().getHours(),
+    () => 12,
+  );
+  const lateEvening = hour >= 21 || hour < 4;
 
   const { data, loading, error, setData } = useAsync(
     async () => {
@@ -69,6 +76,7 @@ export default function HomePage() {
   return (
     <main className="px-5 pt-5">
       <OutboxSync />
+      <InstallBanner />
       <header className="flex items-start justify-between">
         <div>
           <TripSwitcher />
@@ -86,7 +94,18 @@ export default function HomePage() {
           <div className="h-24 rounded-2xl skeleton" />
         </div>
       ) : !trip ? (
-        <Empty emoji="🧳" title="You're not in a trip yet" hint="Ask the trip lead to add you, then come back here." />
+        <Empty
+          emoji="🧳"
+          title="No trip yet"
+          hint={isReviewer ? "Create the trip and add the team." : "Ask the trip lead to add you, then come back here."}
+          action={
+            isReviewer ? (
+              <Link href="/admin/trips">
+                <Button size="sm">Create a trip</Button>
+              </Link>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           {/* Spend card */}
@@ -160,9 +179,9 @@ export default function HomePage() {
                   <Sparkles className="size-5" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-bold">Done spending for today?</div>
+                  <div className="font-bold">{lateEvening ? "Before you sleep 🌙" : "Done spending for today?"}</div>
                   <div className="text-[13px] text-ink-3">
-                    {stats.todayCount > 0 ? `${stats.todayCount} logged so far.` : "Scan your receipts, then"} mark the day as done.
+                    {stats.todayCount > 0 ? `${stats.todayCount} logged so far.` : lateEvening ? "Nothing logged today yet — scan today's receipts, then" : "Scan your receipts, then"} mark the day as done.
                   </div>
                 </div>
               </div>

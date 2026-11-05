@@ -16,11 +16,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import type { ClaimAi } from "@/components/claim-form";
+
 /** One AI-detected purchase (or the single manual entry). */
 interface Draft {
   id: string;
   values: ClaimFormValues;
-  ai: { confidence: ScanResult["confidence"]; notes: string | null; verification?: ScanResult["verification"] } | null;
+  ai: ClaimAi | null;
   raw: ScanResult | null;
   imageIds: string[];
   done?: "sent" | "offline" | "skipped";
@@ -29,7 +31,7 @@ interface Draft {
 type Step =
   | { s: "pick" }
   | { s: "scanning" }
-  | { s: "form"; drafts: Draft[]; active: number }
+  | { s: "form"; drafts: Draft[]; active: number; regroup?: Draft[] }
   | { s: "done"; sent: ClaimFormOutput[]; offline: number; skipped: number };
 
 const SHARE_CACHE = "bino-share";
@@ -44,6 +46,11 @@ export default function ScanPage() {
   const [offlineCount, setOfflineCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const sharePicked = useRef(false);
+  const auditRef = useRef<Promise<void> | null>(null);
+  const stepRef = useRef<Step>(step);
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   // Web Share Target pickup: the service worker stores shared screenshots under /shared/ in the
   // "bino-share" cache and opens /scan?share=1. Read them, scan, then clear the cache.
@@ -90,37 +97,87 @@ export default function ScanPage() {
   async function scan(list: PickedImage[] = images) {
     if (!list.length) return;
     setStep({ s: "scanning" });
+    const payloadImages = list.map((i) => ({ dataUrl: i.dataUrl }));
     try {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          images: list.map((i) => ({ dataUrl: i.dataUrl })),
+          images: payloadImages,
           context: { tripId: trip!.id, tripCode: trip!.code, memberCashRate: membership?.cash_rate ?? null, today: todayISO() },
         }),
       });
-      const json = (await res.json()) as { claims?: ScanResult[]; error?: string };
+      const json = (await res.json()) as { claims?: ScanResult[]; issues?: string[]; audit?: unknown; error?: string };
       if (!res.ok || !json.claims?.length) throw new Error(json.error || "Scan failed");
 
-      const drafts: Draft[] = json.claims.map((r) => {
-        const extra = (r as ScanResult & { image_indexes?: number[] }).image_indexes;
-        const idx = extra?.length ? extra : r.images.map((im) => im.index);
-        return {
-          id: crypto.randomUUID(),
-          values: valuesFromScan(r),
-          ai: { confidence: r.confidence, notes: r.notes, verification: r.verification },
-          raw: r,
-          imageIds: idx.map((i) => list[i]?.id).filter(Boolean) as string[],
-        };
-      });
-      // Any image the AI did not assign goes with the first claim.
-      const assigned = new Set(drafts.flatMap((d) => d.imageIds));
-      for (const img of list) if (!assigned.has(img.id)) drafts[0].imageIds.push(img.id);
+      const drafts = draftsFrom(json.claims, list, true);
       setStep({ s: "form", drafts, active: 0 });
+
+      // Second read runs in the background; the form is already usable.
+      auditRef.current = (async () => {
+        try {
+          const r2 = await fetch("/api/scan/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images: payloadImages, audit: json.audit, issues: json.issues ?? [] }),
+          });
+          const j2 = (await r2.json()) as { claims?: ScanResult[]; error?: string };
+          if (!r2.ok || !j2.claims?.length) throw new Error(j2.error || "verify failed");
+          applyAudit(j2.claims, list);
+        } catch (e) {
+          console.warn("second read skipped:", e);
+          setStep((prev) => (prev.s === "form" ? { ...prev, drafts: prev.drafts.map((d) => (d.ai ? { ...d, ai: { ...d.ai, auditing: false } } : d)) } : prev));
+        } finally {
+          auditRef.current = null;
+        }
+      })();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Scan failed — fill it in manually", "err");
       manual("expense", list);
     }
+  }
+
+  function draftsFrom(claims: ScanResult[], list: PickedImage[], auditing: boolean): Draft[] {
+    const drafts: Draft[] = claims.map((r) => {
+      const idx = r.image_indexes?.length ? r.image_indexes : r.images.map((im) => im.index);
+      return {
+        id: crypto.randomUUID(),
+        values: valuesFromScan(r),
+        ai: { confidence: r.confidence, notes: r.notes, verification: r.verification, auditing },
+        raw: r,
+        imageIds: idx.map((i) => list[i]?.id).filter(Boolean) as string[],
+      };
+    });
+    // Any image the AI did not assign goes with the first claim.
+    const assigned = new Set(drafts.flatMap((d) => d.imageIds));
+    for (const img of list) if (!assigned.has(img.id)) drafts[0].imageIds.push(img.id);
+    return drafts;
+  }
+
+  /** Merge the second read into the open drafts without touching what the user already typed. */
+  function applyAudit(claims2: ScanResult[], list: PickedImage[]) {
+    setStep((prev) => {
+      if (prev.s !== "form") return prev;
+      const anyDone = prev.drafts.some((d) => d.done);
+      if (claims2.length !== prev.drafts.length) {
+        // The second read grouped the screenshots differently. Offer it as a whole, unless something was already sent.
+        if (anyDone) return { ...prev, drafts: prev.drafts.map((d) => (d.ai ? { ...d, ai: { ...d.ai, auditing: false } } : d)) };
+        return { ...prev, regroup: draftsFrom(claims2, list, false) };
+      }
+      const drafts = prev.drafts.map((d, i) => {
+        const c = claims2[i];
+        if (!d.ai || !c) return d;
+        const v = c.verification;
+        const mine = (v?.corrections ?? []).filter((x) => prev.drafts.length === 1 || x.field.startsWith(`claim ${i + 1} `));
+        const corrections = mine.map((x) => ({ ...x, field: x.field.replace(/^claim \d+ /, "") }));
+        return {
+          ...d,
+          raw: corrections.length ? c : d.raw,
+          ai: { ...d.ai, auditing: false, confidence: c.confidence, notes: c.notes ?? d.ai.notes, verification: v ? { ...v, corrections } : d.ai.verification, suggestion: corrections.length ? valuesFromScan(c) : null },
+        };
+      });
+      return { ...prev, drafts };
+    });
   }
 
   function manual(kind: ClaimKind = "expense", list: PickedImage[] = images) {
@@ -190,8 +247,13 @@ export default function ScanPage() {
 
   /** Submit every remaining draft with its AI values as read. */
   async function submitAllRemaining() {
-    if (step.s !== "form") return;
-    const drafts = [...step.drafts];
+    if (auditRef.current) {
+      toast("Finishing the second read…");
+      await auditRef.current;
+    }
+    const cur = stepRef.current;
+    if (cur.s !== "form") return;
+    const drafts = [...cur.drafts];
     const todo = drafts.filter((d) => !d.done);
     const invalid = todo.filter((d) => !d.values.description.trim() || (!d.values.amount_myr && !d.values.amount_rmb));
     if (invalid.length) {
@@ -290,6 +352,19 @@ export default function ScanPage() {
                   className={`h-1.5 flex-1 rounded-full ${i === step.active ? "bg-brand" : d.done && d.done !== "skipped" ? "bg-green" : d.done === "skipped" ? "bg-line" : "bg-card-2"}`}
                 />
               ))}
+            </div>
+          )}
+          {step.regroup && (
+            <div className="mb-3 rounded-2xl bg-amber-soft text-amber px-4 py-3 text-sm anim-pop">
+              <div className="font-semibold">Second read sees {step.regroup.length} purchase{step.regroup.length === 1 ? "" : "s"} instead of {step.drafts.length}.</div>
+              <div className="flex gap-2 mt-2">
+                <button type="button" className="h-9 px-3 rounded-full bg-amber text-white font-semibold" onClick={() => setStep({ s: "form", drafts: step.regroup!, active: 0 })}>
+                  Use that
+                </button>
+                <button type="button" className="h-9 px-3 rounded-full bg-card text-ink font-semibold" onClick={() => setStep({ ...step, regroup: undefined })}>
+                  Keep mine
+                </button>
+              </div>
             </div>
           )}
           <Thumbs images={images.filter((i) => step.drafts[step.active].imageIds.includes(i.id))} />

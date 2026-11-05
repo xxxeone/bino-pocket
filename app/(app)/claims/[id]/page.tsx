@@ -2,9 +2,9 @@
 
 import { ClaimForm, valuesFromClaim, type ClaimFormOutput } from "@/components/claim-form";
 import { useApp } from "@/components/providers";
-import { Avatar, Badge, Empty, Sheet, Spinner, StatusBadge, useToast } from "@/components/ui";
+import { Avatar, Badge, Button, Empty, Sheet, Spinner, StatusBadge, useToast } from "@/components/ui";
 import { CATEGORIES, PAYMENT_METHODS, PLATFORMS, PURPOSES, optionEmoji, optionLabel } from "@/lib/constants";
-import { deleteClaim, getClaim, receiptUrl, updateClaim } from "@/lib/data";
+import { deleteClaim, getClaim, receiptUrl, reviewClaim, updateClaim } from "@/lib/data";
 import type { ClaimWithPeople } from "@/lib/types";
 import { fmtDateDMY, fmtMYR, fmtRMB, fmtRate } from "@/lib/utils";
 import { useAsync } from "@/lib/use-async";
@@ -14,7 +14,7 @@ import { useState } from "react";
 
 export default function ClaimDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { profile } = useApp();
+  const { profile, isReviewer, isAdmin } = useApp();
   const router = useRouter();
   const toast = useToast();
   const { data: claim, loading, reload } = useAsync<ClaimWithPeople | null>(() => getClaim(id).catch(() => null), [id]);
@@ -36,6 +36,24 @@ export default function ClaimDetailPage() {
 
   const mine = claim.user_id === profile.id;
   const editable = mine && claim.status === "pending";
+  const canReview = isReviewer && claim.status === "pending" && (!mine || isAdmin);
+
+  async function review(status: "approved" | "rejected") {
+    let reason: string | undefined;
+    if (status === "rejected") {
+      const r = window.prompt("Why is this rejected? (the member will see this)");
+      if (!r?.trim()) return;
+      reason = r.trim();
+    }
+    try {
+      await reviewClaim(claim!.id, status, profile.id, reason);
+      if (status === "approved") void fetch("/api/drive/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ claimId: claim!.id }) }).catch(() => {});
+      toast(status === "approved" ? "Approved ✓" : "Rejected");
+      reload();
+    } catch (e) {
+      toast((e as Error).message, "err");
+    }
+  }
   const kindLabel = claim.kind === "transfer" ? "Transfer" : claim.kind === "cash_in" ? "Petty cash received" : null;
   const url = (imageId: string) => urls?.[imageId] ?? "";
 
@@ -101,6 +119,14 @@ export default function ClaimDetailPage() {
             <span className="text-3xl font-bold tabular-nums">{fmtMYR(claim.amount_myr)}</span>
             <span className="text-ink-3 tabular-nums text-lg">{fmtRMB(claim.amount_rmb)}</span>
           </div>
+          {canReview && (
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <Button variant="secondary" className="text-rose" onClick={() => review("rejected")}>
+                ✗ Reject
+              </Button>
+              <Button onClick={() => review("approved")}>✓ Approve</Button>
+            </div>
+          )}
           {claim.status === "rejected" && claim.reject_reason && (
             <div className="mt-3 rounded-xl bg-rose-soft text-rose text-sm p-3">
               <span className="font-semibold">Rejected:</span> {claim.reject_reason}
